@@ -121,7 +121,7 @@ def evaluate(dataset, model, device, tag_vocab=None, filename=None):
         with open(filename, 'w') as f:
             for y_pred in predicts:
                 # convert tag_id to its original label
-                tag = tag_vocab.i2w[y_pred]
+                tag = tag_vocab.id2word[y_pred]
                 f.write(f'{tag}\n')
         print(f'  -Save predictions to {filename}')
     return acc/len(predicts)
@@ -195,7 +195,7 @@ def main():
 
             if train_iter % args.eval_niter == 0:
                 print(f'Evaluate dev data:')
-                dev_accuracy = evaluate(dev_data, model, device) 
+                dev_accuracy = evaluate(dev_data, model, device)
                 if dev_accuracy > best_records[1]:
                     print(f'  -Update best model at {train_iter}, dev accuracy={dev_accuracy:.4f}')
                     best_records = (train_iter, dev_accuracy)

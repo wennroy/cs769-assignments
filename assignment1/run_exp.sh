@@ -1,5 +1,5 @@
 # Step 0. Change this to your campus ID
-CAMPUSID='9xx1234567'
+CAMPUSID='9082789315'
 mkdir -p $CAMPUSID
 
 # Step 1. (Optional) Any preprocessing step, e.g., downloading pre-trained word embeddings
