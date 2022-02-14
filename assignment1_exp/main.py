@@ -15,7 +15,7 @@ def get_args():
     parser.add_argument("--train", type=str, default="data/sst-train.txt")
     parser.add_argument("--dev", type=str, default="data/sst-dev.txt")
     parser.add_argument("--test", type=str, default="data/sst-test.txt")
-    parser.add_argument("--emb_file", type=str, default=None)
+    parser.add_argument("--emb_file", type=str, default="data/crawl-300d-2M.vec/crawl-300d-2M.vec") # "data/crawl-300d-2M.vec/crawl-300d-2M.vec"
     parser.add_argument("--emb_size", type=int, default=300)
     parser.add_argument("--hid_size", type=int, default=300)
     parser.add_argument("--hid_layer", type=int, default=3)
@@ -24,7 +24,7 @@ def get_args():
     parser.add_argument("--hid_drop", type=float, default=0.333)
     parser.add_argument("--pooling_method", type=str, default="avg", choices=["sum", "avg", "max"])
     parser.add_argument("--grad_clip", type=float, default=5.0)
-    parser.add_argument("--max_train_epoch", type=int, default=5)
+    parser.add_argument("--max_train_epoch", type=int, default=10)
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--lrate", type=float, default=0.005)
     parser.add_argument("--lrate_decay", type=float, default=0)  # 0 means no decay!
@@ -34,6 +34,8 @@ def get_args():
     parser.add_argument("--model", type=str, default="model.pt")  # save/load model name
     parser.add_argument("--dev_output", type=str, default="output.dev.txt")  # output for dev
     parser.add_argument("--test_output", type=str, default="output.test.txt")  # output for dev
+    parser.add_argument("--port", type=int, default=54824)  # debug on pydev console
+    parser.add_argument("--initvalue", type=float, default=0.5)
     args = parser.parse_args()
     print(f"RUN: {vars(args)}")
     return args
@@ -79,7 +81,20 @@ def pad_sentences(sents, pad_id):
     Return:
         aug_sents: list(list(int)), |s_1| == |s_i|, for s_i in sents
     """
-    raise NotImplementedError()
+    # Time consuming method
+    max_seq_length = 0
+    for sent in sents:
+        n = len(sent)
+        if n > max_seq_length:
+            max_seq_length = n
+
+    for sent in sents:
+        n = len(sent)
+        if n < max_seq_length:
+            for _ in range(max_seq_length - n):
+                sent.append(pad_id)
+    return sents
+    # raise NotImplementedError()
 
 def compute_grad_norm(model, norm_type=2):
     """
