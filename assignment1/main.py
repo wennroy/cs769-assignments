@@ -15,7 +15,7 @@ def get_args():
     parser.add_argument("--train", type=str, default="data/sst-train.txt")
     parser.add_argument("--dev", type=str, default="data/sst-dev.txt")
     parser.add_argument("--test", type=str, default="data/sst-test.txt")
-    parser.add_argument("--emb_file", type=str, default=None)
+    parser.add_argument("--emb_file", type=str, default="data/crawl-300d-2M.vec/crawl-300d-2M.vec")
     parser.add_argument("--emb_size", type=int, default=300)
     parser.add_argument("--hid_size", type=int, default=300)
     parser.add_argument("--hid_layer", type=int, default=3)
@@ -24,16 +24,17 @@ def get_args():
     parser.add_argument("--hid_drop", type=float, default=0.333)
     parser.add_argument("--pooling_method", type=str, default="avg", choices=["sum", "avg", "max"])
     parser.add_argument("--grad_clip", type=float, default=5.0)
-    parser.add_argument("--max_train_epoch", type=int, default=5)
+    parser.add_argument("--max_train_epoch", type=int, default=100)
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--lrate", type=float, default=0.005)
-    parser.add_argument("--lrate_decay", type=float, default=0)  # 0 means no decay!
+    parser.add_argument("--lrate_decay", type=float, default=0.001)  # 0 means no decay!
     parser.add_argument("--mrate", type=float, default=0.85)
     parser.add_argument("--log_niter", type=int, default=100)
-    parser.add_argument("--eval_niter", type=int, default=500)
+    parser.add_argument("--eval_niter", type=int, default=300)
     parser.add_argument("--model", type=str, default="model.pt")  # save/load model name
     parser.add_argument("--dev_output", type=str, default="output.dev.txt")  # output for dev
     parser.add_argument("--test_output", type=str, default="output.test.txt")  # output for dev
+    parser.add_argument("--patience", type=int, default=15)  # Patience round for early stop
     args = parser.parse_args()
     print(f"RUN: {vars(args)}")
     return args
@@ -79,7 +80,19 @@ def pad_sentences(sents, pad_id):
     Return:
         aug_sents: list(list(int)), |s_1| == |s_i|, for s_i in sents
     """
-    raise NotImplementedError()
+    max_seq_length = 0
+    for sent in sents:
+        n = len(sent)
+        if n > max_seq_length:
+            max_seq_length = n
+
+    for sent in sents:
+        n = len(sent)
+        if n < max_seq_length:
+            for _ in range(max_seq_length - n):
+                sent.append(pad_id)
+    return sents
+    # raise NotImplementedError()
 
 def compute_grad_norm(model, norm_type=2):
     """
@@ -108,6 +121,7 @@ def evaluate(dataset, model, device, tag_vocab=None, filename=None):
     """
     Evaluate test/dev set
     """
+    model.eval()
     predicts = []
     acc = 0
     for words, tag in dataset:
@@ -124,6 +138,7 @@ def evaluate(dataset, model, device, tag_vocab=None, filename=None):
                 tag = tag_vocab.id2word[y_pred]
                 f.write(f'{tag}\n')
         print(f'  -Save predictions to {filename}')
+    model.train()
     return acc/len(predicts)
 
 def main():
@@ -152,6 +167,7 @@ def main():
     ntags = len(tag_vocab)
     print('nwords', nwords, 'ntags', ntags)
     model = mn.DanModel(args, word_vocab, len(tag_vocab)).to(device)
+    print(model)
     loss_func = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adagrad(model.parameters(), lr=args.lrate, lr_decay=args.lrate_decay)
 
@@ -160,6 +176,9 @@ def main():
     train_iter = 0
     train_loss = train_example = train_correct = 0
     best_records = (0, 0)  # [best_iter, best_accuracy]
+    not_exceed_the_best = 0  # Early STOP
+    Patience = args.patience  # If # of not_exceed_the_best > Patience: Early Stop
+
     for epoch in range(args.max_train_epoch):
         for batch in data_iter(train_data, batch_size=args.batch_size, shuffle=True):
             train_iter += 1
@@ -197,9 +216,15 @@ def main():
                 print(f'Evaluate dev data:')
                 dev_accuracy = evaluate(dev_data, model, device)
                 if dev_accuracy > best_records[1]:
+                    not_exceed_the_best = 0
                     print(f'  -Update best model at {train_iter}, dev accuracy={dev_accuracy:.4f}')
                     best_records = (train_iter, dev_accuracy)
                     model.save(args.model)
+                else:
+                    not_exceed_the_best += 1
+        if not_exceed_the_best > Patience:
+            print(f"  Dev Accuracy did not increase for last {Patience} times, EARLY STOP!")
+            break
 
     # Load the best model
     model.load(args.model)

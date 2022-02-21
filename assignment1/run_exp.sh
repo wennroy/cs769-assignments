@@ -3,7 +3,10 @@ CAMPUSID='9082789315'
 mkdir -p $CAMPUSID
 
 # Step 1. (Optional) Any preprocessing step, e.g., downloading pre-trained word embeddings
-
+cd data
+wget -O crawl-300d-2M.vec.zip https://dl.fbaipublicfiles.com/fasttext/vectors-english/crawl-300d-2M.vec.zip
+unzip crawl-300d-2M.vec.zip
+cd ..
 
 # Step 2. Train models on two datasets.
 ##  2.1. Run experiments on SST
@@ -29,7 +32,7 @@ python main.py \
 
 # Step 3. Prepare submission:
 ##  3.1. Copy your code to the $CAMPUSID folder
-for file in 'main.py' 'model.py' 'vocab.py' 'setup.py'; do
+for file in 'main.py' 'model.py' 'vocab.py' 'setup.py' 'run_exp.sh'; do
 	cp $file ${CAMPUSID}/
 done
 ##  3.2. Compress the $CAMPUSID folder to $CAMPUSID.zip (containing only .py/.txt/.pdf/.sh files)

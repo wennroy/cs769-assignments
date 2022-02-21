@@ -82,18 +82,29 @@ class DanModel(BaseModel):
             self.embedding_layer = nn.Embedding(self.vocab.__len__(), self.args.emb_size, padding_idx=self.vocab.pad_id, max_norm=True)
             self.embedding_layer.weight.data.uniform_(-self.args.initvalue,self.args.initvalue)
         self.h1layer = nn.Linear(self.args.emb_size, self.args.hid_size)
+        self.h2layer = nn.Linear(self.args.emb_size, self.tag_size)
+        self.h12layer = nn.Linear(self.args.hid_size, self.args.emb_size)
         self.ReLU = nn.ReLU()
-        self.h2layer = nn.Linear(self.args.hid_size, self.tag_size)
-        self.droplayer = nn.Dropout(self.args.hid_drop)
+        self.tanh = nn.Tanh()
+        self.sigmoid = nn.Sigmoid()
+        self.hid_drop = nn.Dropout(self.args.hid_drop)
+        self.word_drop = nn.Dropout(self.args.word_drop)
+        self.emb_drop = nn.Dropout(self.args.emb_drop)
+        self.identity = nn.Identity()
         self.logsoftmax = nn.LogSoftmax()
+        self.softmax = nn.Softmax()
+        self.linears = nn.ModuleList([nn.Linear(self.args.hid_size, self.args.hid_size) for _ in range(self.args.hid_layer-2)])
+        # self.identity_linears = nn.ModuleList([nn.Identity() for _ in range(self.args.hid_layer-2)])
         # raise NotImplementedError()
 
     def init_model_parameters(self):
         """
         Initialize the model's parameters by uniform sampling from a range [-v, v], e.g., v=0.08
         """
-        self.h1layer.weight.data.uniform_(-self.args.initvalue, self.args.initvalue)
-        self.h2layer.weight.data.uniform_(-self.args.initvalue, self.args.initvalue)
+        for ind, layer in enumerate(self.linears):
+            nn.init.xavier_normal_(layer.weight.data, gain=1.0)
+        nn.init.xavier_normal_(self.h1layer.weight.data, gain=1.0)
+        nn.init.xavier_normal_(self.h2layer.weight.data, gain=1.0)
 
         # raise NotImplementedError()
 
@@ -116,13 +127,21 @@ class DanModel(BaseModel):
             scores: (torch.FloatTensor), [batch_size, ntags]
         """
         emb_x = self.embedding_layer(x)  # [batch_size, seq_length, emb_size]
+        emb_x = self.emb_drop(emb_x)
         avg = torch.mean(emb_x,dim=1)  # [batch_size, emb_size]
         h1 = self.h1layer(avg)  # [batch_size, hid_size]
         h1 = self.ReLU(h1)  # [batch_size, hid_size]
-        h1 = self.droplayer(h1)
-        h2 = self.h2layer(h1)  # [batch_size, tag_size]
-        h2 = self.droplayer(h2)
+        # h1 = self.hid_drop(h1)
+        for ind, layer in enumerate(self.linears): # REPEAT n-2 Hidden Layers
+            h1 = layer(h1)
+            h1 = self.ReLU(h1)
+            # h1 = self.hid_drop(h1)
+        h12 = self.h12layer(h1)
+        h12 += self.identity(avg)
+        h2 = self.h2layer(h12)  # [batch_size, tag_size]
+        # h2 = self.hid_drop(h2)
         scores = self.logsoftmax(h2)
+        # scores = self.softmax(h2)
         return scores
 
         # raise NotImplementedError()

@@ -1,4 +1,3 @@
-from collections import defaultdict
 import os
 import time
 import random
@@ -19,22 +18,22 @@ def get_args():
     parser.add_argument("--emb_size", type=int, default=300)
     parser.add_argument("--hid_size", type=int, default=300)
     parser.add_argument("--hid_layer", type=int, default=3)
-    parser.add_argument("--word_drop", type=float, default=0.3)
-    parser.add_argument("--emb_drop", type=float, default=0.333)
-    parser.add_argument("--hid_drop", type=float, default=0.333)
+    parser.add_argument("--word_drop", type=float, default=0.3) #0.3
+    parser.add_argument("--emb_drop", type=float, default=0.333) #0.333
+    parser.add_argument("--hid_drop", type=float, default=0.333) #0.333
     parser.add_argument("--pooling_method", type=str, default="avg", choices=["sum", "avg", "max"])
     parser.add_argument("--grad_clip", type=float, default=5.0)
-    parser.add_argument("--max_train_epoch", type=int, default=10)
+    parser.add_argument("--max_train_epoch", type=int, default=30)
     parser.add_argument("--batch_size", type=int, default=16)
     parser.add_argument("--lrate", type=float, default=0.005)
-    parser.add_argument("--lrate_decay", type=float, default=0)  # 0 means no decay!
+    parser.add_argument("--lrate_decay", type=float, default=0.001)  # 0 means no decay!
     parser.add_argument("--mrate", type=float, default=0.85)
     parser.add_argument("--log_niter", type=int, default=100)
     parser.add_argument("--eval_niter", type=int, default=500)
     parser.add_argument("--model", type=str, default="model.pt")  # save/load model name
     parser.add_argument("--dev_output", type=str, default="output.dev.txt")  # output for dev
     parser.add_argument("--test_output", type=str, default="output.test.txt")  # output for dev
-    parser.add_argument("--port", type=int, default=54824)  # debug on pydev console
+    parser.add_argument("--port", type=int, default=54824)  # debug on pycharm python console
     parser.add_argument("--initvalue", type=float, default=0.5)
     args = parser.parse_args()
     print(f"RUN: {vars(args)}")
@@ -167,6 +166,7 @@ def main():
     ntags = len(tag_vocab)
     print('nwords', nwords, 'ntags', ntags)
     model = mn.DanModel(args, word_vocab, len(tag_vocab)).to(device)
+    print(model)
     loss_func = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adagrad(model.parameters(), lr=args.lrate, lr_decay=args.lrate_decay)
 
