@@ -2,6 +2,7 @@ import time, random, numpy as np, argparse, sys, re, os
 from types import SimpleNamespace
 
 import torch
+import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 from sklearn.metrics import classification_report, f1_score, recall_score, accuracy_score
@@ -38,12 +39,24 @@ class BertSentClassifier(torch.nn.Module):
                 param.requires_grad = True
 
         # todo
-        raise NotImplementedError
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+        self.dense_layer1 = nn.Linear(config.hidden_size, config.hidden_size)
+        self.dense_layer1_af = nn.Tanh()
+        self.dense_layer2 = nn.Linear(config.hidden_size, config.num_labels)
+        # raise NotImplementedError
 
     def forward(self, input_ids, attention_mask):
         # todo
         # the final bert contextualize embedding is the hidden state of [CLS] token (the first token)
-        raise NotImplementedError
+        output = self.bert(input_ids, attention_mask)
+        first_token = output["pooler_output"]  # [batch_size, hidden_size]
+        h1 = self.dense_layer1(first_token)  # [batch_size, hidden_size]
+        h1 = self.dense_layer1_af(h1)
+        h1 = self.dropout(h1)
+        h2 = self.dense_layer2(h1)  # [batch_size, num_labels]
+        scores = F.logsigmoid(h2)
+        return scores
+        # raise NotImplementedError
 
 # create a custom Dataset Class to be used for the dataloader
 class BertDataset(Dataset):
@@ -99,7 +112,7 @@ def create_data(filename, flag='train'):
     num_labels = {}
     data = []
 
-    with open(filename, 'r') as fp:
+    with open(filename, 'r', encoding="UTF-8") as fp:  # Add encoding method = "UTF-8"
         for line in fp:
             label, org_sent = line.split(' ||| ')
             sent = org_sent.lower().strip()
@@ -189,6 +202,7 @@ def train(args):
     best_dev_acc = 0
 
     ## run for the specified number of epochs
+    start_time = time.time()
     for epoch in range(args.epochs):
         model.train()
         train_loss = 0
@@ -221,6 +235,7 @@ def train(args):
             save_model(model, optimizer, args, config, args.filepath)
 
         print(f"epoch {epoch}: train loss :: {train_loss :.3f}, train acc :: {train_acc :.3f}, dev acc :: {dev_acc :.3f}")
+        print(f'time={time.time()-start_time:.2f}s')
 
 
 def test(args):
@@ -273,7 +288,6 @@ def get_args():
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.3)
     parser.add_argument("--lr", type=float, help="learning rate, default lr for 'pretrain': 1e-3, 'finetune': 1e-5",
                         default=1e-5)
-
     args = parser.parse_args()
     print(f"args: {vars(args)}")
     return args

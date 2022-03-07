@@ -2,7 +2,7 @@ from typing import Callable, Iterable, Tuple
 
 import torch
 from torch.optim import Optimizer
-
+import math
 
 class AdamW(Optimizer):
     def __init__(
@@ -38,23 +38,44 @@ class AdamW(Optimizer):
                 if grad.is_sparse:
                     raise RuntimeError("Adam does not support sparse gradients, please consider SparseAdam instead")
 
-                raise NotImplementedError()
+                # raise NotImplementedError()
 
                 # State should be stored in this dictionary
                 state = self.state[p]
 
+                # State initialization
+                if len(state) == 0:
+                    # Initialize steps
+                    state['step'] = 0
+                    # Initialize the first moments of the gradients
+                    state["m"] = grad.new().resize_as_(grad).zero_()
+                    # Initialize the second moments of the gradients
+                    state["v"] = grad.new().resize_as_(grad).zero_()
+
+                m, v = state["m"], state["v"]
+                state["step"] += 1
+
                 # Access hyperparameters from the `group` dictionary
                 alpha = group["lr"]
+                beta1, beta2 = group["betas"]
+                correct_bias = group["correct_bias"]
+                eps = group["eps"]
+                weight_decay = group["weight_decay"]
 
                 # Update first and second moments of the gradients
+                m.mul_(beta1).add_(grad, alpha=1-beta1)
+                v.mul_(beta2).addcmul_(grad, grad, value=1-beta2)
 
                 # Bias correction
                 # Please note that we are using the "efficient version" given in
                 # https://arxiv.org/abs/1412.6980
+                if correct_bias:
+                    alpha = alpha * math.sqrt(1-beta2**state["step"]) / (1-beta1**state["step"])
 
                 # Update parameters
-
+                denom = v.sqrt().add_(eps)
+                p.data.addcdiv_(m, denom, value=-alpha)
                 # Add weight decay after the main gradient-based updates.
                 # Please note that the learning rate should be incorporated into this update.
-
+                p.data.add_(p.data, alpha=-weight_decay*group["lr"])
         return loss
